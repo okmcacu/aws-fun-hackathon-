@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>README Roast · የኮድ ጥብስ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+:root{--bg:#fbfaf8;--surface:#fff;--text:#1c1b1a;--muted:#6b6862;--line:#e3e0da;--accent:#d9480f;--accent-t:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--surface:#161b22;--text:#e6edf3;--muted:#8b949e;--line:#30363d;--accent:#ff6b35;--accent-t:#0d1117}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.7 "Noto Sans Ethiopic",system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:32px 18px 60px}
+h1{font-size:2rem;margin:0 0 4px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 22px}
+input,select{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:15px "JetBrains Mono",monospace}
+select{font-family:inherit;width:auto}
+.row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+button{background:var(--accent);color:var(--accent-t);border:0;border-radius:10px;padding:12px 22px;font:700 1rem "Noto Sans Ethiopic",sans-serif;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}
+button.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+#out{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:18px 20px;white-space:pre-wrap;display:none}
+#err{color:var(--accent);margin-top:14px}
+footer{margin-top:34px;color:var(--muted);font-size:.8rem}
+</style>
+</head>
+<body>
+<main>
+<h1>README <span>Roast</span> 🔥</h1>
+<p class="sub">የGitHub repo ሊንክ ለጥፍ — README ን አንብበን ያለ ርኅራኄ እንጠብሰዋለን።</p>
+<input id="repo" placeholder="https://github.com/username/project" autocomplete="off">
+<div class="row">
+  <select id="tone" aria-label="Roast style">
+    <option value="espresso">☕ ቡና የበዛበት ሲኒየር</option>
+    <option value="lead">😤 የተከፋ ቴክ ሊድ</option>
+    <option value="elder">👴 ምሳሌ የሚጠቅስ ሽማግሌ</option>
+  </select>
+  <button id="go">🔥 ጥብስ!</button>
+  <button class="ghost" id="copy" style="display:none">ቅዳ</button>
+</div>
+<div id="err"></div>
+<div id="out" aria-live="polite"></div>
+<footer>ቀልድ ብቻ ነው — ኮዱን እንጂ ሰውን አንሰድብም። 😄</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+$("go").onclick = async () => {
+  $("err").textContent = ""; $("copy").style.display = "none";
+  const repo = $("repo").value.trim();
+  if (!/github\.com\/[^\/\s]+\/[^\/\s]+/i.test(repo)) { $("err").textContent = "ትክክለኛ የGitHub repo ሊንክ አስገባ።"; return; }
+  const out = $("out"); out.style.display = "block"; out.textContent = "README እያነበብኩ እሳት እያቀጣጠልኩ ነው…";
+  $("go").disabled = true;
+  try {
+    const r = await fetch("/api/roast", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, tone: $("tone").value }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "ስህተት");
+    out.textContent = d.roast; $("copy").style.display = "";
+  } catch (e) { out.style.display = "none"; $("err").textContent = e.message || "ስህተት ተፈጠረ።"; }
+  $("go").disabled = false;
+};
+$("copy").onclick = () => navigator.clipboard.writeText($("out").textContent).then(() => { $("copy").textContent = "ተቀድቷል ✓"; setTimeout(() => $("copy").textContent = "ቅዳ", 1500); });
+</script>
+</body>
+</html>
