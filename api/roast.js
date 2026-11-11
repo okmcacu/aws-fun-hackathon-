@@ -30,22 +30,35 @@ module.exports = async (req, res) => {
       `- ቅርጸት: አጭር ርዕስ፣ 5-7 የጥብስ ነጥቦች (በኢሞጂ ጀምር)፣ 'ፍርድ: X/10'፣ እና አንድ ቅን ምክር በቀልድ መልክ። ከ350 ቃላት አይበልጥ።\n\n` +
       `Repo: ${owner}/${name}\n\nREADME:\n"""\n${readme}\n"""`;
 
-    const g = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 1, maxOutputTokens: 1200 },
-        }),
+    const key = (process.env.GEMINI_API_KEY || "").trim();
+    if (!key) return res.status(500).json({ error: "GEMINI_API_KEY በVercel ላይ አልተገኘም። ካስገባህ በኋላ Redeploy አድርግ።" });
+    const MODELS = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
+    let text = "", lastErr = "";
+    for (const model of MODELS) {
+      const g = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 1, maxOutputTokens: 1500 },
+          }),
+        }
+      );
+      if (g.ok) {
+        const data = await g.json();
+        text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+        if (text) break;
+        lastErr = model + ": empty reply";
+        continue;
       }
-    );
-    if (g.status === 429) return res.status(429).json({ error: "ብዙ ሰው እየጠበሰ ነው፤ ትንሽ ቆይተህ ሞክር።" });
-    if (!g.ok) return res.status(502).json({ error: "የጥብስ ሞተሩ ስህተት አጋጠመው።" });
-    const data = await g.json();
-    const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "";
-    if (!text) return res.status(502).json({ error: "ባዶ መልስ መጣ፤ እንደገና ሞክር።" });
+      const detail = await g.text();
+      console.error("Gemini", model, g.status, detail);
+      lastErr = model + " -> " + g.status + " " + detail.slice(0, 250);
+      if (g.status === 400 || g.status === 401 || g.status === 403) break; // key problem, other models won't help
+    }
+    if (!text) return res.status(502).json({ error: "Gemini ስህተት: " + lastErr });
     res.status(200).json({ roast: text, repo: `${owner}/${name}` });
   } catch (e) {
     res.status(500).json({ error: "ያልታሰበ ስህተት።" });
